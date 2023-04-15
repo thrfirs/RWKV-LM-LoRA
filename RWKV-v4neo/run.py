@@ -58,21 +58,28 @@ vocab_size = 50277
 # n_embd = 2560
 # ctx_len = 1024
 
-MODEL_NAME = '/fsx/BlinkDL/HF-MODEL/rwkv-4-pile-7b/RWKV-4-Pile-7B-20221115-8047'
-n_layer = 32
-n_embd = 4096
+MODEL_NAME = "/root/RWKV-4-Pile-1B5-EngChn-testNovel-done-ctx2048-20230225"
+LORA_NAME = "/root/models_binary/rwkv/230413-ao3-test/rwkv-150"
+n_layer = 24
+n_embd = 2048
 ctx_len = 1024
+lora_r = 8
+lora_alpha = 16
 
 args.MODEL_NAME = MODEL_NAME
+args.MODEL_LORA = LORA_NAME
 args.n_layer = n_layer
 args.n_embd = n_embd
 args.ctx_len = ctx_len
+args.lora_r = lora_r
+args.lora_alpha = lora_alpha
 args.vocab_size = vocab_size
 args.head_qk = 0
 args.pre_ffn = 0
 args.grad_cp = 0
 args.my_pos_emb = 0
 os.environ["RWKV_RUN_DEVICE"] = args.RUN_DEVICE
+
 
 ########################################################################################################
 # Step 2: set prompt & sampling stuffs
@@ -81,7 +88,8 @@ os.environ["RWKV_RUN_DEVICE"] = args.RUN_DEVICE
 # context = 'A'
 # context = "\nIn the"
 # context = '\nSugar:'
-context = "\nIn a shocking finding, scientist discovered a herd of dragons living in a remote, previously unexplored valley, in Tibet. Even more surprising to the researchers was the fact that the dragons spoke perfect Chinese."
+# context = "\nIn a shocking finding, scientist discovered a herd of dragons living in a remote, previously unexplored valley, in Tibet. Even more surprising to the researchers was the fact that the dragons spoke perfect Chinese."
+context = "他说，"
 
 # context = "\n深圳是" # test Chinese
 # context = "\n東京は" # test Japanese
@@ -178,7 +186,7 @@ state = None
 out = None
 
 for TRIAL in range(1 if DEBUG_DEBUG else NUM_TRIALS):
-    print(("-" * 50) + '\n' + context, end="")
+    print(("-" * 50) + "\n" + context + ">>>", end="")
 
     time_ref = time.time_ns()
     ctx = src_ctx.copy()
@@ -206,8 +214,8 @@ for TRIAL in range(1 if DEBUG_DEBUG else NUM_TRIALS):
             out, state = model.forward(x, state)
         if DEBUG_DEBUG:
             print("model", np.array(x), "==>", np.array(out), np.max(out.cpu().numpy()), np.min(out.cpu().numpy()))
-        if TOKEN_MODE == "pile":
-            out[0] = -999999999  # disable <|endoftext|>
+        # if TOKEN_MODE == "pile":
+        #     out[0] = -999999999  # disable <|endoftext|>
 
         ttt = tokenizer.sample_logits(
             out,
@@ -223,6 +231,9 @@ for TRIAL in range(1 if DEBUG_DEBUG else NUM_TRIALS):
             char = tokenizer.itos[ttt]
             print(char, end="", flush=True)
         else:
+            if not ttt:
+                print("\n[Early stop]", end="")
+                break
             char = tokenizer.tokenizer.decode(ctx[out_last:])
             if '\ufffd' not in char: # is valid utf8 string?
                 print(char, end="", flush=True)
