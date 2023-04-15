@@ -91,6 +91,7 @@ class train_callback(pl.Callback):
                 self.log("REAL it/s", 1.0 / t_cost, prog_bar=True, on_step=True)
                 self.log("Kt/s", kt_s, prog_bar=True, on_step=True)
             except:
+                kt_s = 0
                 pass
             trainer.my_time_ns = t_now
             trainer.my_loss = trainer.my_loss_all.float().mean().item()
@@ -102,9 +103,12 @@ class train_callback(pl.Callback):
             # self.log("s", real_step, prog_bar=True, on_step=True)
 
             if len(args.wandb) > 0:
-                lll = {"loss": trainer.my_loss, "lr": trainer.my_lr, "Gtokens": real_step * token_per_step / 1e9}
-                if kt_s > 0:
-                    lll["kt/s"] = kt_s
+                lll = {
+                    "loss": trainer.my_loss,
+                    "lr": trainer.my_lr,
+                    "IO/Gtokens": real_step * token_per_step / 1e9,
+                    "IO/speed(kt)": kt_s,
+                }
                 trainer.my_wandb.log(lll, step=int(real_step))
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
