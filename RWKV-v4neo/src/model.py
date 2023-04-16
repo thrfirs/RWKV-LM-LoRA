@@ -26,6 +26,13 @@ LORA_CONFIG = {
     "parts": {"att", "ln", "time"},
 }
 
+DTYPE_MAP = {
+    "fp16": torch.float16,
+    "fp32": torch.float32,
+    "bf16": torch.bfloat16,
+}
+DTYPE = DTYPE_MAP[os.environ["RWKV_FLOAT_MODE"]]
+
 
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
@@ -155,13 +162,13 @@ class LoraLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, bias: bool):
         super().__init__()
 
-        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+        self.weight = nn.Parameter(torch.empty((out_features, in_features), dtype=DTYPE))
         assert bias == False, "Biased LoraLinear not supported"
 
         r, alpha, dropout = LORA_CONFIG["r"], LORA_CONFIG[
             "alpha"], LORA_CONFIG["dropout"]
-        self.lora_A = nn.Parameter(torch.empty(r, in_features))
-        self.lora_B = nn.Parameter(torch.empty(out_features, r))
+        self.lora_A = nn.Parameter(torch.empty(r, in_features, dtype=DTYPE))
+        self.lora_B = nn.Parameter(torch.empty(out_features, r, dtype=DTYPE))
         self.lora_dropout = nn.Dropout(dropout)
         self.scaling = alpha / r
 
@@ -233,7 +240,7 @@ class RWKV_TimeMix(MyModule):
         self.value = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.receptance = make_linear_att(args.n_embd, args.dim_att, bias=False)
 
-        self.output = nn.Linear(args.dim_att, args.n_embd, bias=False)
+        self.output = nn.Linear(args.dim_att, args.n_embd, bias=False, dtype=DTYPE)
 
         if 'a' in os.environ["RWKV_MY_TESTING"]:
             self.register_buffer("att_mask", torch.tril(torch.ones(args.ctx_len, args.ctx_len)))
@@ -452,12 +459,12 @@ class RWKV(pl.LightningModule):
         if not hasattr(args, 'tiny_att_dim'):
             args.tiny_att_dim = -1
 
-        self.emb = nn.Embedding(args.vocab_size, args.n_embd)
+        self.emb = nn.Embedding(args.vocab_size, args.n_embd, dtype=DTYPE)
 
         self.blocks = nn.ModuleList([Block(args, i) for i in range(args.n_layer)])
 
         self.ln_out = nn.LayerNorm(args.n_embd)
-        self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False)
+        self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False, dtype=DTYPE)
 
         if args.head_qk > 0:
             self.head_q = nn.Linear(args.n_embd, args.head_qk, bias=False)

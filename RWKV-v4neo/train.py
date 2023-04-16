@@ -282,8 +282,14 @@ if __name__ == "__main__":
     from src.trainer import train_callback, generate_init_weight
     from src.dataset import MyDataset
 
-    train_data = MyDataset(args)
-    args.vocab_size = train_data.vocab_size
+    trainer = Trainer.from_argparse_args(
+        args,
+        callbacks=[train_callback(args)],
+    )
+
+    if "deepspeed" in args.strategy:
+        trainer.strategy.config["zero_optimization"]["allgather_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
+        trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
 
     if args.data_type == 'wds_img':
         from src.model_img import RWKV_IMG
@@ -344,29 +350,25 @@ if __name__ == "__main__":
         for k in model.state_dict():
             if k not in load_keys:
                 load_dict[k] = model.state_dict()[k]
-    # If using LoRA, the LoRA keys might be missing in the original model
+
     model.load_state_dict(load_dict, strict=(not args.lora))
+    del load_dict
+    # If using LoRA, the LoRA keys might be missing in the original model
     if os.path.isfile(args.lora_load):
         model.load_state_dict(torch.load(args.lora_load, map_location="cpu"),
                               strict=False)
 
-    trainer = Trainer.from_argparse_args(
-        args,
-        callbacks=[train_callback(args)],
-    )
-
     if trainer.global_rank == 0:
-        for n in model.state_dict():
-            shape = model.state_dict()[n].shape
+        for n, p in model.state_dict(keep_vars=True).items():
+            shape = p.shape
             shape = [i for i in shape if i != 1]
             if len(shape) > 1:
-                print(f"{str(shape[0]).ljust(5)} {str(shape[1]).ljust(5)} {n}")
+                print(f"{str(shape[0]).ljust(5)} {str(shape[1]).ljust(5)} {str(p.requires_grad).ljust(5)} {str(p.dtype).ljust(14)} {n}")
             else:
-                print(f"{str(shape[0]).ljust(5)}       {n}")
+                print(f"{str(shape[0]).ljust(5)}       {str(p.requires_grad).ljust(5)} {str(p.dtype).ljust(14)} {n}")
 
-    if "deepspeed" in args.strategy:
-        trainer.strategy.config["zero_optimization"]["allgather_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
-        trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
+    train_data = MyDataset(args)
+    args.vocab_size = train_data.vocab_size
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
