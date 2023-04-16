@@ -312,17 +312,17 @@ if __name__ == "__main__":
             for name, module in model.named_modules():
                 # have to check param name since it may have been wrapped by torchscript
                 if any(n.startswith("lora_") for n, _ in module.named_parameters()):
-                    print(f'  LoRA training module {name}')
+                    rank_zero_info(f'  LoRA training module {name}')
                     for pname, param in module.named_parameters():
                         param.requires_grad = 'lora_' in pname
                 elif enable_ln_finetune and '.ln' in name:
-                    print(f'  LoRA additionally training module {name}')
+                    rank_zero_info(f'  LoRA additionally training module {name}')
                     for param in module.parameters():
                         param.requires_grad = True
                 elif enable_time_finetune and any(n.startswith("time") for n, _ in module.named_parameters()):
                     for pname, param in module.named_parameters():
                         if pname.startswith("time"):
-                            print(f'  LoRA additionally training parameter {pname}')
+                            rank_zero_info(f'  LoRA additionally training parameter {pname}')
                             param.requires_grad = True
 
     if len(args.load_model) == 0 or args.my_pile_stage == 1:  # shall we build the initial weights?
