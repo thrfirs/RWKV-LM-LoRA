@@ -124,7 +124,6 @@ def RUN_CUDA(B, T, C, w, u, k, v):
 
 
 class LoraLinear(nn.Module):
-
     def __init__(self, in_features: int, out_features: int, bias: bool):
         super().__init__()
 
@@ -138,7 +137,7 @@ class LoraLinear(nn.Module):
         self.lora_dropout = nn.Dropout(dropout)
         self.scaling = alpha / r
 
-        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        nn.init.zeros_(self.weight)
         nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
         nn.init.zeros_(self.lora_B)
 
