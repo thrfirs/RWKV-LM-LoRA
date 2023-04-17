@@ -2,8 +2,8 @@
 #include <assert.h>
 
 #define MIN_VALUE (-1e38)
+typedef float F;
 
-template <typename F>
 __global__ void kernel_forward(const int B, const int T, const int C,
                                const F *__restrict__ const _w, const F *__restrict__ const _u, const F *__restrict__ const _k, const F *__restrict__ const _v,
                                F *__restrict__ const _y) {
@@ -13,7 +13,7 @@ __global__ void kernel_forward(const int B, const int T, const int C,
     const int _offset = _b * T * C + _c;
 
     F u = _u[_c];
-    F w = _w[_c];
+    F w = -exp(_w[_c]);
     const F *__restrict__ const k = _k + _offset;
     const F *__restrict__ const v = _v + _offset;
     F *__restrict__ const y = _y + _offset;

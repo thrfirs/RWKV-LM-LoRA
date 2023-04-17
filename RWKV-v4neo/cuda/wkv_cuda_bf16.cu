@@ -5,7 +5,7 @@
 typedef at::BFloat16 bf16;
 
 __global__ void kernel_forward(const int B, const int T, const int C,
-                               const float *__restrict__ const _w, const bf16 *__restrict__ const _u, const bf16 *__restrict__ const _k, const bf16 *__restrict__ const _v,
+                               const bf16 *__restrict__ const _w, const bf16 *__restrict__ const _u, const bf16 *__restrict__ const _k, const bf16 *__restrict__ const _v,
                                bf16 *__restrict__ const _y) {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int _b = idx / C;
@@ -13,7 +13,7 @@ __global__ void kernel_forward(const int B, const int T, const int C,
     const int _offset = _b * T * C + _c;
 
     float u = float(_u[_c]);
-    float w = _w[_c];
+    float w = -exp(float(_w[_c]));
     const bf16 *__restrict__ const k = _k + _offset;
     const bf16 *__restrict__ const v = _v + _offset;
     bf16 *__restrict__ const y = _y + _offset;
@@ -41,7 +41,7 @@ __global__ void kernel_forward(const int B, const int T, const int C,
     }
 }
 
-void cuda_forward(int B, int T, int C, float *w, bf16 *u, bf16 *k, bf16 *v, bf16 *y) {
+void cuda_forward(int B, int T, int C, bf16 *w, bf16 *u, bf16 *k, bf16 *v, bf16 *y) {
     dim3 threadsPerBlock( min(C, 32) ); // requires --maxrregcount 60 for optimal performance
     assert(B * C % threadsPerBlock.x == 0);
     dim3 numBlocks(B * C / threadsPerBlock.x);

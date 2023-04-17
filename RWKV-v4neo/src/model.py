@@ -69,7 +69,7 @@ if os.environ["RWKV_FLOAT_MODE"] == "bf16":
             ctx.C = C
             assert T <= T_MAX
             assert B * C % min(C, 32) == 0
-            w = -torch.exp(w.float().contiguous())
+            w = w.contiguous()
             u = u.contiguous()
             k = k.contiguous()
             v = v.contiguous()
@@ -91,12 +91,12 @@ else:
             assert T <= T_MAX
             assert B * C % min(C, 32) == 0
             if "32" in os.environ["RWKV_FLOAT_MODE"]:
-                w = -torch.exp(w.contiguous())
+                w = w.contiguous()
                 u = u.contiguous()
                 k = k.contiguous()
                 v = v.contiguous()
             else:
-                w = -torch.exp(w.float().contiguous())
+                w = w.float().contiguous()
                 u = u.float().contiguous()
                 k = k.float().contiguous()
                 v = v.float().contiguous()
