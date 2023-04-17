@@ -542,21 +542,15 @@ class RWKV(pl.LightningModule):
         x_emb = x
 
         if args.tiny_att_dim > 0:
-            for block in self.blocks:
-                if args.grad_cp == 1:
-                    if args.lora:
-                        x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
-                    else:
-                        x = deepspeed.checkpointing.checkpoint(block, x, x_emb)
+            for i, block in enumerate(self.blocks):
+                if i and args.grad_cp == 1:
+                    x = deepspeed.checkpointing.checkpoint(block, x, x_emb)
                 else:
                     x = block(x, x_emb)
         else:
-            for block in self.blocks:
-                if args.grad_cp == 1:
-                    if args.lora:
-                        x = torch_checkpoint(block, x, use_reentrant=False)
-                    else:
-                        x = deepspeed.checkpointing.checkpoint(block, x)
+            for i, block in enumerate(self.blocks):
+                if i and args.grad_cp == 1:
+                    x = deepspeed.checkpointing.checkpoint(block, x)
                 else:
                     x = block(x)
 

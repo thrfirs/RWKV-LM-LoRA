@@ -257,9 +257,6 @@ if __name__ == "__main__":
     os.environ["RWKV_JIT_ON"] = "1"
     if "deepspeed_stage_3" in args.strategy:
         os.environ["RWKV_JIT_ON"] = "0"
-    if args.lora and args.grad_cp == 1:
-        print('!!!!! LoRA Warning: Gradient Checkpointing requires JIT off, disabling it')
-        os.environ["RWKV_JIT_ON"] = "0"
 
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
