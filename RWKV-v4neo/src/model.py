@@ -60,7 +60,7 @@ T_MAX = int(os.environ["RWKV_T_MAX"])  # TAKES LOTS OF VRAM!
 from torch.utils.cpp_extension import load
 
 if os.environ["RWKV_FLOAT_MODE"] == "bf16":
-    wkv_cuda = load(name=f"wkv_{T_MAX}_bf16", sources=["cuda/wkv_op_bf16.cpp", "cuda/wkv_cuda_bf16.cu"], verbose=True, extra_cuda_cflags=["-t 4", "-std=c++17", "-res-usage", "--maxrregcount 60", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-DTmax={T_MAX}"])
+    wkv_cuda = load(name=f"wkv_{T_MAX}_bf16", sources=["cuda/wkv_op_bf16.cpp", "cuda/wkv_cuda_bf16.cu"], verbose=True, extra_cuda_cflags=["-t 4", "-std=c++17", "-res-usage", "--maxrregcount 40", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-DTmax={T_MAX}"])
     class WKV(torch.autograd.Function):
         @staticmethod
         def forward(ctx, B, T, C, w, u, k, v):
@@ -89,7 +89,7 @@ if os.environ["RWKV_FLOAT_MODE"] == "bf16":
             gu = torch.empty((B, C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
             gk = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
             gv = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
-            wkv_cuda.backward(B, T, C, w, u, k, v, y, gy.contiguous(), gw, gu, gk, gv)
+            # wkv_cuda.backward(B, T, C, w, u, k, v, y, gy.contiguous(), gw, gu, gk, gv)
             gw = torch.sum(gw, dim=0)
             gu = torch.sum(gu, dim=0)
             return (None, None, None, gw, gu, gk, gv)
@@ -162,7 +162,7 @@ class LoraLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, bias: bool):
         super().__init__()
 
-        self.weight = nn.Parameter(torch.empty((out_features, in_features), dtype=DTYPE))
+        self.weight = nn.Parameter(torch.empty((out_features, in_features), dtype=DTYPE), requires_grad=False)
         assert bias == False, "Biased LoraLinear not supported"
 
         r, alpha, dropout = LORA_CONFIG["r"], LORA_CONFIG[
@@ -461,7 +461,7 @@ class RWKV(pl.LightningModule):
 
         self.emb = nn.Embedding(args.vocab_size, args.n_embd, dtype=DTYPE)
 
-        self.blocks = nn.ModuleList([Block(args, i) for i in range(args.n_layer)])
+        self.blocks = nn.ModuleList(Block(args, i) for i in range(args.n_layer))
 
         self.ln_out = nn.LayerNorm(args.n_embd)
         self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False, dtype=DTYPE)
@@ -554,7 +554,7 @@ class RWKV(pl.LightningModule):
             for block in self.blocks:
                 if args.grad_cp == 1:
                     if args.lora:
-                        x = torch_checkpoint(block, x, x_emb, use_reentrant=False)
+                        x = torch_checkpoint(block, x, use_reentrant=False)
                     else:
                         x = deepspeed.checkpointing.checkpoint(block, x)
                 else:
