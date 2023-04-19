@@ -18,6 +18,9 @@ class train_callback(pl.Callback):
     def __init__(self, args):
         super().__init__()
         self.args = args
+    
+    def on_train_start(self, trainer, pl_module):
+        trainer.first_iter_flag = True
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
         args = self.args
@@ -55,7 +58,7 @@ class train_callback(pl.Callback):
         trainer.my_lr = lr
         # rank_zero_info(f"{real_step} {lr}")
 
-        if trainer.global_step == 0:
+        if trainer.global_step == 0 and trainer.first_iter_flag:
             if trainer.is_global_zero:  # logging
                 trainer.my_loss_sum = 0
                 trainer.my_loss_count = 0
@@ -77,6 +80,7 @@ class train_callback(pl.Callback):
                         save_code=False,
                     )
                     trainer.my_wandb = wandb
+        trainer.first_iter_flag = False
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         args = self.args
