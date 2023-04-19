@@ -77,9 +77,21 @@ if os.environ["RWKV_FLOAT_MODE"] == "bf16":
             wkv_cuda.forward(B, T, C, w, u, k, v, y)
             ctx.save_for_backward(w, u, k, v, y)
             return y
-        @staticmethod
-        def backward(ctx, gy):
-            return (None, None, None, None, None, None, None)
+        if os.environ["RWKV_EMPTY_BACKWARD"] == "1":
+            @staticmethod
+            def backward(ctx, gy):
+                return (None, None, None, None, None, None, None)
+        else:
+            @staticmethod
+            def backward(ctx, gy):
+                B = ctx.B
+                T = ctx.T
+                C = ctx.C
+                gw = torch.empty((C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
+                gu = torch.empty((C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
+                gk = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
+                gv = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format, dtype=torch.bfloat16)
+                return (None, None, None, gw, gu, gk, gv)
 else:
     wkv_cuda = load(name=f"wkv_{T_MAX}", sources=["cuda/wkv_op.cpp", "cuda/wkv_cuda.cu"], verbose=True, extra_cuda_cflags=["-res-usage", "--maxrregcount 40", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization", f"-DTmax={T_MAX}"])
     class WKV(torch.autograd.Function):
@@ -109,9 +121,24 @@ else:
                 return y.half()
             elif os.environ["RWKV_FLOAT_MODE"] == "bf16":
                 return y.bfloat16()
-        @staticmethod
-        def backward(ctx, gy):
-            return (None, None, None, None, None, None, None)
+        if os.environ["RWKV_EMPTY_BACKWARD"] == "1":
+            @staticmethod
+            def backward(ctx, gy):
+                return (None, None, None, None, None, None, None)
+        else:
+            @staticmethod
+            def backward(ctx, gy):
+                B = ctx.B
+                T = ctx.T
+                C = ctx.C
+                gw = torch.empty((C), device=gy.device, memory_format=torch.contiguous_format)
+                gu = torch.empty((C), device=gy.device, memory_format=torch.contiguous_format)
+                gk = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format)
+                gv = torch.empty((B, T, C), device=gy.device, memory_format=torch.contiguous_format)
+                if "32" in os.environ["RWKV_FLOAT_MODE"]:
+                    return (None, None, None, gw, gu, gk, gv)
+                elif os.environ["RWKV_FLOAT_MODE"] == "fp16":
+                    return (None, None, None, gw.half(), gu.half(), gk.half(), gv.half())
 
 
 def RUN_CUDA(B, T, C, w, u, k, v):

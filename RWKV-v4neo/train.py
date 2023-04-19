@@ -159,6 +159,8 @@ if __name__ == "__main__":
         args.proj_dir = f"{args.proj_dir}-{args.run_name}"
     else:
         args.run_name = f"{args.vocab_size} ctx{args.ctx_len} L{args.n_layer} D{args.n_embd}"
+        if args.lora:
+            args.run_name += f" LORA{args.lora_r}-{args.lora_alpha}-{args.lora_dropout}-{args.lora_parts}"
     if not os.path.exists(args.proj_dir):
         os.makedirs(args.proj_dir)
 
@@ -257,6 +259,10 @@ if __name__ == "__main__":
     os.environ["RWKV_JIT_ON"] = "1"
     if "deepspeed_stage_3" in args.strategy:
         os.environ["RWKV_JIT_ON"] = "0"
+    
+    os.environ["RWKV_EMPTY_BACKWARD"] = "0"
+    if args.strategy == "deepspeed_stage_1":
+        os.environ["RWKV_EMPTY_BACKWARD"] = "1"
 
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
