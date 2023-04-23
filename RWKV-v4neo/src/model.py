@@ -190,6 +190,14 @@ def make_linear_ffn(*args, **kwargs):
         return nn.Linear(*args, **kwargs)
 
 
+@functools.wraps(LoraLinear)
+def make_linear_head(*args, **kwargs):
+    if "head" in LORA_CONFIG["parts"] and LORA_CONFIG["r"] > 0:
+        return LoraLinear(*args, **kwargs)
+    else:
+        return nn.Linear(*args, **kwargs)
+
+
 ########################################################################################################
 # RWKV: RWKV Time-mix + RWKV Channel-mix
 ########################################################################################################
@@ -232,7 +240,7 @@ class RWKV_TimeMix(MyModule):
         self.value = make_linear_att(args.n_embd, args.dim_att, bias=False)
         self.receptance = make_linear_att(args.n_embd, args.dim_att, bias=False)
 
-        self.output = nn.Linear(args.dim_att, args.n_embd, bias=False, dtype=DTYPE)
+        self.output = make_linear_head(args.dim_att, args.n_embd, bias=False)
 
         if 'a' in os.environ["RWKV_MY_TESTING"]:
             self.register_buffer("att_mask", torch.tril(torch.ones(args.ctx_len, args.ctx_len)))
@@ -456,7 +464,7 @@ class RWKV(pl.LightningModule):
         self.blocks = nn.ModuleList(Block(args, i) for i in range(args.n_layer))
 
         self.ln_out = nn.LayerNorm(args.n_embd)
-        self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False, dtype=DTYPE)
+        self.head = make_linear_head(args.n_embd, args.vocab_size, bias=False)
 
         if args.head_qk > 0:
             self.head_q = nn.Linear(args.n_embd, args.head_qk, bias=False)
