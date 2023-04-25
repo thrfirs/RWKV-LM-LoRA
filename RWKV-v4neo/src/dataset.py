@@ -187,7 +187,7 @@ class MyDataset(Dataset):
                     # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size} ii {ii} pos {round(i / self.data_size, 3)}")
                 elif args.pile_shuffle:
                     if self.pile_shuffle_i is None:
-                        self.pile_shuffle_i = rank + epoch * self.samples_per_epoch  # assume rank is far less than number of indices
+                        self.pile_shuffle_i = (rank + epoch * self.samples_per_epoch) % self.indices_size
                     i = self.pile_shuffle_indices[self.pile_shuffle_i]
                     self.pile_shuffle_i = (self.pile_shuffle_i + world_size) % self.indices_size
                 else:
