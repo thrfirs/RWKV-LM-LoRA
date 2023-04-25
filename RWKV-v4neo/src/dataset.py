@@ -53,11 +53,13 @@ class MyDataset(Dataset):
             self.data_size = len(self.data)
             rank_zero_info(f"Data has {self.data_size} tokens.")
             if args.pile_shuffle:
+                self.samples_per_epoch = args.epoch_steps * args.real_bsz
                 indices = np.arange(0, self.data_size - args.ctx_len, args.pile_shuffle_step)
                 np.random.default_rng(args.pile_shuffle_seed).shuffle(indices)
+                self.indices_size = len(indices)
                 self.pile_shuffle_indices = indices
                 self.pile_shuffle_i = None
-                rank_zero_info(f"Data has {len(indices)} pile shuffle indices.")
+                rank_zero_info(f"Data has {self.indices_size} pile shuffle indices.")
         elif args.data_type == "uint16":
             self.data = np.fromfile(args.data_file, dtype=np.uint16).astype("int32").reshape(-1, args.my_sample_len)
             self.vocab_size = args.vocab_size
@@ -185,9 +187,9 @@ class MyDataset(Dataset):
                     # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size} ii {ii} pos {round(i / self.data_size, 3)}")
                 elif args.pile_shuffle:
                     if self.pile_shuffle_i is None:
-                        self.pile_shuffle_i = rank  # assume rank is far less than number of indices
+                        self.pile_shuffle_i = rank + epoch * self.samples_per_epoch  # assume rank is far less than number of indices
                     i = self.pile_shuffle_indices[self.pile_shuffle_i]
-                    self.pile_shuffle_i = (self.pile_shuffle_i + world_size) % len(self.pile_shuffle_indices)
+                    self.pile_shuffle_i = (self.pile_shuffle_i + world_size) % self.indices_size
                 else:
                     # cheat: pick a random spot in dataset
                     i = np.random.randint(0, self.data_size - req_len)
