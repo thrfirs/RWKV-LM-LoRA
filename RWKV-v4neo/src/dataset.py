@@ -52,6 +52,12 @@ class MyDataset(Dataset):
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
             self.data_size = len(self.data)
             rank_zero_info(f"Data has {self.data_size} tokens.")
+            if args.pile_shuffle:
+                indices = np.arange(0, self.data_size - args.ctx_len, args.pile_shuffle_step)
+                np.random.default_rng((1 + self.global_rank) * args.pile_shuffle_seed).shuffle(indices)
+                self.pile_shuffle_indices = indices
+                self.pile_shuffle_i = 0
+                rank_zero_info(f"Data has {len(indices)} pile shuffle indices.")
         elif args.data_type == "uint16":
             self.data = np.fromfile(args.data_file, dtype=np.uint16).astype("int32").reshape(-1, args.my_sample_len)
             self.vocab_size = args.vocab_size
@@ -177,6 +183,9 @@ class MyDataset(Dataset):
                     if (args.my_qa_mask == 0) or (data == self.data_pile):
                         i = i + args.my_pile_shift
                     # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size} ii {ii} pos {round(i / self.data_size, 3)}")
+                elif args.pile_shuffle:
+                    i = self.pile_shuffle_indices[self.pile_shuffle_i]
+                    self.pile_shuffle_i = (self.pile_shuffle_i + 1) % len(self.pile_shuffle_indices)
                 else:
                     # cheat: pick a random spot in dataset
                     i = np.random.randint(0, self.data_size - req_len)

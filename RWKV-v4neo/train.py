@@ -59,6 +59,9 @@ if __name__ == "__main__":
     parser.add_argument("--vocab_size", default=0, type=int)  # vocab_size = 0 means auto (for char-level LM and .txt data)
 
     parser.add_argument("--ctx_len", default=1024, type=int)
+    parser.add_argument("--pile_shuffle", action="store_true")
+    parser.add_argument("--pile_shuffle_step", default=512, type=int)
+    parser.add_argument("--pile_shuffle_seed", default=42, type=int)  # should be > 0
     parser.add_argument("--epoch_steps", default=1000, type=int)  # a mini "epoch" has [epoch_steps] steps
     parser.add_argument("--epoch_count", default=500, type=int)  # train for this many "epochs". will continue afterwards with lr = lr_final
     parser.add_argument("--epoch_begin", default=0, type=int)  # if you load a model trained for x "epochs", set epoch_begin = x
